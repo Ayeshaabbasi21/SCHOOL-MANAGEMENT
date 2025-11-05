@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Grid, Box, Button } from '@mui/material';
+import { Container, Grid, Box } from '@mui/material';
 import styled from 'styled-components';
 import Students from "../assets/students.svg";
 import { LightPurpleButton } from '../components/buttonStyles';
@@ -32,16 +32,9 @@ const Homepage = () => {
                                     Login
                                 </LightPurpleButton>
                             </StyledLink>
-                            <StyledLink to="/chooseasguest">
-                                <Button variant="outlined" fullWidth
-                                    sx={{ mt: 2, mb: 3, color: "#7f56da", borderColor: "#7f56da" }}
-                                >
-                                    Login as Guest
-                                </Button>
-                            </StyledLink>
                             <StyledText>
                                 Don't have an account?{' '}
-                                <Link to="/Adminregister" style={{color:"#550080"}}>
+                                <Link to="/Adminregister" style={{ color: "#550080" }}>
                                     Sign up
                                 </Link>
                             </StyledText>
@@ -71,7 +64,7 @@ const StyledBox = styled(Box)`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content:center;
+  justify-content: center;
   gap: 16px;
   padding: 24px;
 `;
@@ -79,7 +72,6 @@ const StyledBox = styled(Box)`
 const StyledTitle = styled.h1`
   font-size: 3rem;
   color: #252525;
-  /* font-family: "Manrope"; */
   font-weight: bold;
   padding-top: 0;
   letter-spacing: normal;
@@ -87,7 +79,6 @@ const StyledTitle = styled.h1`
 `;
 
 const StyledText = styled.p`
-  /* color: #550080; */
   margin-top: 30px;
   margin-bottom: 30px; 
   letter-spacing: normal;
