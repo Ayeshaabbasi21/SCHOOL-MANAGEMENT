@@ -4,7 +4,7 @@ services:
   ci_mongo:
     image: mongo:6.0
     container_name: ci_mongo
-    restart: "no"
+    restart: "always"
     volumes:
       - ci_mongo_data:/data/db
     networks:
