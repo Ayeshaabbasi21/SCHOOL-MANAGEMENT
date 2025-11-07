@@ -23,6 +23,11 @@ pipeline {
           sh 'docker-compose -f docker-compose.ci.yml up -d --build'
         }
       }
+       post {
+         success {
+           echo "✅ Containers are running live on ports 6000 (backend) and 8081 (frontend)"
+         }
+       }
     }
 
     stage('Verify') {

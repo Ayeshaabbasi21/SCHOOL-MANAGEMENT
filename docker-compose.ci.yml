@@ -4,7 +4,7 @@ services:
   ci_mongo:
     image: mongo:6.0
     container_name: ci_mongo
-    restart: "always"
+    restart: always
     volumes:
       - ci_mongo_data:/data/db
     networks:
@@ -17,10 +17,11 @@ services:
     volumes:
       - ./backend:/app:cached
     ports:
-      - "6000:5000"    # host:container -> backend will be reachable on host port 6000
-    command: sh -c "npm install --silent && npm run start"
+      - "6000:5000"    # backend exposed on host port 6000
+    command: sh -c "npm install --silent && npm start"
     depends_on:
       - ci_mongo
+    restart: always
     networks:
       - ci-network
 
@@ -31,10 +32,11 @@ services:
     volumes:
       - ./frontend:/app:cached
     ports:
-      - "8081:80"      # host:container -> frontend will be reachable on host port 8081
+      - "8081:80"      # frontend exposed on host port 8081
     command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
     depends_on:
       - ci_backend
+    restart: always
     networks:
       - ci-network
 
