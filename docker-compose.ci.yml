@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  ci_mongo:
+    image: mongo:6.0
+    container_name: ci_mongo
+    restart: "no"
+    volumes:
+      - ci_mongo_data:/data/db
+    networks:
+      - ci-network
+
+  ci_backend_build:
+    image: node:18-alpine
+    container_name: ci_backend_build
+    working_dir: /app
+    volumes:
+      - ./backend:/app:cached
+      - /home/ubuntu/.npm-cache:/root/.npm
+    networks:
+      - ci-network
+    command: sh -c "npm install --silent && npm run build"
+    depends_on:
+      - ci_mongo
+
+  ci_frontend_build:
+    image: node:18-alpine
+    container_name: ci_frontend_build
+    working_dir: /app
+    volumes:
+      - ./frontend:/app:cached
+      - /home/ubuntu/.npm-cache:/root/.npm
+    networks:
+      - ci-network
+    command: sh -c "npm install --silent && npm run build"
+    depends_on:
+      - ci_backend_build
+
+volumes:
+  ci_mongo_data:
+
+networks:
+  ci-network:
+    driver: bridge
