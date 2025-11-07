@@ -10,31 +10,33 @@ services:
     networks:
       - ci-network
 
-  ci_backend_build:
+  ci_backend:
     image: node:18-alpine
-    container_name: ci_backend_build
+    container_name: ci_backend
     working_dir: /app
     volumes:
       - ./backend:/app:cached
-      - /home/ubuntu/.npm-cache:/root/.npm
-    networks:
-      - ci-network
-    command: sh -c "npm install --silent && npm run build"
+    ports:
+      - "6000:5000"    # host:container -> backend will be reachable on host port 6000
+    command: sh -c "npm install --silent && npm run start"
     depends_on:
       - ci_mongo
+    networks:
+      - ci-network
 
-  ci_frontend_build:
+  ci_frontend:
     image: node:18-alpine
-    container_name: ci_frontend_build
+    container_name: ci_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app:cached
-      - /home/ubuntu/.npm-cache:/root/.npm
+    ports:
+      - "8081:80"      # host:container -> frontend will be reachable on host port 8081
+    command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
+    depends_on:
+      - ci_backend
     networks:
       - ci-network
-    command: sh -c "npm install --silent && npm run build"
-    depends_on:
-      - ci_backend_build
 
 volumes:
   ci_mongo_data:

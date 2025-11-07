@@ -2,7 +2,6 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CRED = 'dockerhub-creds'
     GITHUB_CRED = 'github-pat'
   }
 
@@ -16,26 +15,35 @@ pipeline {
       }
     }
 
-    stage('CI Build') {
+    stage('CI: Build & Deploy (docker-compose)') {
       steps {
         dir('repo') {
+          // tear down any previous CI env, then bring up CI env detached
           sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
-          sh 'docker-compose -f docker-compose.ci.yml up --build --abort-on-container-exit --exit-code-from ci_frontend_build'
+          sh 'docker-compose -f docker-compose.ci.yml up -d --build'
         }
       }
-      post {
-        always {
-          dir('repo') {
-            sh 'docker-compose -f docker-compose.ci.yml down --volumes || true'
-          }
+    }
+
+    stage('Verify') {
+      steps {
+        dir('repo') {
+          // optional quick check: list containers and ports
+          sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
         }
       }
     }
   }
 
   post {
-    success { echo "Pipeline succeeded" }
-    failure { echo "Pipeline failed" }
-    always { cleanWs() }
+    success {
+      echo "CI pipeline succeeded. Frontend should be at http://<HOST_IP>:8081 and backend at http://<HOST_IP>:6000"
+    }
+    failure {
+      echo "CI pipeline failed. Check console logs."
+    }
+    always {
+      cleanWs()
+    }
   }
 }
