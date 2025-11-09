@@ -2,72 +2,96 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_CRED = 'github-pat' // Jenkins credential ID for GitHub PAT
-        HOST_IP = '16.171.155.132' // EC2 public IP
+        DOCKER_COMPOSE = 'docker-compose.ci.yml'
+        BACKEND_URL = 'http://localhost:6000/health'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone Repository') {
             steps {
-                echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: env.GITHUB_CRED, variable: 'GH_TOKEN')]) {
-                    sh 'rm -rf repo || true'
-                    sh "git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo"
-                }
+                echo "📥 Cloning repository..."
+                git branch: 'main', url: 'https://github.com/Ayeshabbasi21/MERN-School-Management-System.git'
+            }
+        }
+
+        stage('CI: Tear down previous Part II containers') {
+            steps {
+                echo "🛠 Tearing down Part II containers (if any)..."
+                sh """
+                # Remove previous containers if they exist
+                docker rm -f ci_mongo ci_backend ci_frontend || true
+                # Remove dangling networks to avoid conflicts
+                docker network prune -f || true
+                # Bring down any old containers from docker-compose
+                docker-compose -f ${DOCKER_COMPOSE} down --remove-orphans -v || true
+                """
             }
         }
 
         stage('CI: Build & Deploy Part II') {
             steps {
-                dir('repo') {
-                    echo "🛠 Tearing down previous Part II containers (if any)"
-                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
-
-                    echo "🚀 Starting Part II CI containers (frontend 8081, backend 6000)"
-                    sh 'docker-compose -f docker-compose.ci.yml up -d --build'
-
-                    // Optional: clean old dangling images
-                    sh 'docker system prune -f || true'
-                }
+                echo "🚀 Starting Part II CI containers (frontend 8081, backend 6000)..."
+                sh """
+                docker-compose -f ${DOCKER_COMPOSE} up -d --build
+                """
             }
-            post {
-                success {
-                    echo "✅ Part II CI containers should now be running"
-                }
+        }
+
+        stage('Wait for Services') {
+            steps {
+                echo "⏳ Waiting for MongoDB and Backend to be ready..."
+                sh """
+                # Wait for MongoDB
+                for i in {1..10}; do
+                    if docker exec ci_mongo mongo --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; then
+                        echo "✅ MongoDB ready"
+                        break
+                    else
+                        echo "⏳ Waiting for MongoDB..."
+                        sleep 5
+                    fi
+                done
+
+                # Wait for Backend
+                for i in {1..10}; do
+                    if curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
+                        echo "✅ Backend healthy"
+                        break
+                    else
+                        echo "⏳ Waiting for Backend..."
+                        sleep 5
+                    fi
+                done
+                """
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                dir('repo') {
-                    echo "🔎 Listing running containers"
-                    sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
-
-                    echo "💻 Quick backend health check"
-                    sh """
-                        sleep 5
-                        if curl -s http://${HOST_IP}:6000 || true; then
-                            echo '✅ Backend reachable at http://${HOST_IP}:6000'
-                        else
-                            echo '❌ Backend not reachable!'
-                            exit 1
-                        fi
-                    """
-                }
+                echo "🔍 Verifying Frontend and Backend reachability..."
+                sh """
+                if curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
+                    echo "✅ Backend reachable"
+                else
+                    echo "⚠ Backend not reachable"
+                    exit 1
+                fi
+                """
             }
         }
     }
 
     post {
         success {
-            echo "🎉 CI pipeline succeeded!"
-            echo "Frontend: http://${HOST_IP}:8081"
-            echo "Backend: http://${HOST_IP}:6000"
+            echo "✅ CI Build and Deployment Successful!"
+            echo "Frontend: http://16.171.155.132:8081"
+            echo "Backend: http://16.171.155.132:6000"
         }
         failure {
-            echo "⚠️ CI pipeline failed. Check console logs."
+            echo "❌ CI Build Failed! Check console logs."
         }
         always {
+            echo "🧹 Cleaning up workspace..."
             cleanWs()
         }
     }

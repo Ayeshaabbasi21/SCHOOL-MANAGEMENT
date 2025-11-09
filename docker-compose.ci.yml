@@ -11,13 +11,13 @@ services:
       - ci-network
 
   ci_backend:
-    image: node:18-alpine
+    image: node:18-bullseye
     container_name: ci_backend
     working_dir: /app
     volumes:
       - ./backend:/app:cached
     ports:
-      - "6000:5000"       # Host 6000 -> Container 5000
+      - "5000:5000"       # Host 5000 -> Container 5000 (same as Part 1)
     environment:
       - NODE_ENV=production
     command: sh -c "npm install --silent && npm start"
@@ -27,7 +27,7 @@ services:
       - ci-network
 
   ci_frontend:
-    image: node:18-alpine
+    image: node:18-bullseye
     container_name: ci_frontend
     working_dir: /app
     volumes:
@@ -35,7 +35,7 @@ services:
     ports:
       - "8081:80"         # Host 8081 -> Container 80
     environment:
-      - REACT_APP_API_URL=http://16.171.155.132:6000
+      - REACT_APP_BASE_URL=http://16.171.155.132:5000/api   # Calls backend on 5000
     command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80"
     depends_on:
       - ci_backend
