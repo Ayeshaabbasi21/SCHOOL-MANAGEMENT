@@ -17,7 +17,9 @@ services:
     volumes:
       - ./backend:/app:cached
     ports:
-      - "6000:5000"       # CI backend exposed on host 6000
+      - "6000:5000"       # Host 6000 -> Container 5000
+    environment:
+      - NODE_ENV=production
     command: sh -c "npm install --silent && npm start"
     depends_on:
       - ci_mongo
@@ -31,10 +33,13 @@ services:
     volumes:
       - ./frontend:/app:cached
     ports:
-      - "8081:80"         # CI frontend exposed on host 8081
-    command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
+      - "8081:80"         # Host 8081 -> Container 80
+    environment:
+      - REACT_APP_API_URL=http://16.171.155.132:6000
+    command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80"
     depends_on:
       - ci_backend
+    restart: always
     networks:
       - ci-network
 
