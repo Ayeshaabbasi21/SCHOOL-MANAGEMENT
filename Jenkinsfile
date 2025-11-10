@@ -7,6 +7,18 @@ pipeline {
     }
 
     stages {
+
+        stage('Clean Old CI Containers & Workspace') {
+            steps {
+                echo "🧹 Stopping old CI containers and cleaning workspace..."
+                sh """
+                docker-compose -f ${DOCKER_COMPOSE} -p ci down -v || true
+                sudo chown -R jenkins:jenkins $WORKSPACE || true
+                sudo chmod -R u+rwX $WORKSPACE || true
+                """
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 echo "📥 Cloning repository..."
@@ -14,23 +26,7 @@ pipeline {
             }
         }
 
-        stage('Clean Old CI Containers') {
-            steps {
-                echo "🧹 Removing previous Part 2 CI containers..."
-                sh """
-                # Stop and remove previous Part 2 containers
-                docker ps -a --filter "name=ci_frontend" --filter "name=ci_backend" --filter "name=ci_mongo" -q | xargs -r docker rm -f
-                
-                # Remove Part 2 network if exists
-                docker network ls -q --filter name=ci-network | xargs -r docker network rm
-                
-                # Remove Part 2 volume if exists
-                docker volume ls -q --filter name=ci_mongo_data | xargs -r docker volume rm
-                """
-            }
-        }
-
-        stage('Build & Deploy CI (Part 2)') {
+        stage('Build & Deploy CI Containers') {
             steps {
                 echo "🚀 Building and starting CI containers..."
                 sh """
@@ -69,8 +65,10 @@ pipeline {
             echo "⚠️ CI pipeline failed. Check logs."
         }
         always {
-            echo "🧹 Cleaning workspace..."
-            cleanWs()
+            node {
+                echo "🧹 Cleaning workspace..."
+                cleanWs()
+            }
         }
     }
 }
