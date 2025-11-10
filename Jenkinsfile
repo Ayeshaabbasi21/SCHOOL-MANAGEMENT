@@ -16,11 +16,16 @@ pipeline {
 
         stage('Clean Old CI Containers') {
             steps {
-                echo "🧹 Removing previous CI containers..."
+                echo "🧹 Removing previous Part 2 CI containers..."
                 sh """
-                docker rm -f ci_mongo ci_backend ci_frontend || true
-                docker network rm ci-network || true
-                docker volume rm ci_mongo_data || true
+                # Stop and remove previous Part 2 containers
+                docker ps -a --filter "name=ci_frontend" --filter "name=ci_backend" --filter "name=ci_mongo" -q | xargs -r docker rm -f
+                
+                # Remove Part 2 network if exists
+                docker network ls -q --filter name=ci-network | xargs -r docker network rm
+                
+                # Remove Part 2 volume if exists
+                docker volume ls -q --filter name=ci_mongo_data | xargs -r docker volume rm
                 """
             }
         }
