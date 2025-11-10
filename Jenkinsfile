@@ -24,7 +24,7 @@ pipeline {
                     sh 'docker-compose -f docker-compose.ci.yml up -d --build'
                     
                     echo "⏳ Waiting for backend to start..."
-                    sh 'sleep 60'  # Wait 1 minute for npm install + app start
+                    sh 'sleep 60'  // Wait 1 minute for npm install + app start
                 }
             }
         }
