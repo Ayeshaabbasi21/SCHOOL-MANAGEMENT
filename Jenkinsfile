@@ -1,85 +1,60 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_COMPOSE = 'docker-compose.ci.yml'
-        BACKEND_CONTAINER = 'backend'  // name of your backend service in docker-compose
-        BACKEND_URL = 'http://localhost:5000/health'  // inside container
-    }
-
     stages {
-
-        stage('Clean Old CI Containers & Workspace') {
+        stage('Checkout') {
             steps {
-                echo "🧹 Stopping old CI containers and cleaning workspace..."
-                sh """
-                # Stop containers first
-                docker-compose -f ${DOCKER_COMPOSE} -p ci down -v || true
-                
-                # Fix permission issues more safely
-                docker system prune -f || true
-                
-                # Only change ownership if files exist and are owned by root
-                find $WORKSPACE -user root -exec sudo chown jenkins:jenkins {} + 2>/dev/null || true
-                find $WORKSPACE -type d -exec sudo chmod 755 {} + 2>/dev/null || true
-                find $WORKSPACE -type f -exec sudo chmod 644 {} + 2>/dev/null || true
-                """
-                
-                # Let Jenkins handle the main workspace cleanup
-                cleanWs()
+                echo "🔄 Cloning latest code from GitHub"
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                    sh '''
+                    rm -rf repo
+                    git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
+                    '''
+                }
             }
         }
 
-        stage('Clone Repository') {
+        stage('CI: Build & Deploy Part II') {
             steps {
-                echo "📥 Cloning repository..."
-                git branch: 'main', url: 'https://github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git'
+                dir('repo') {
+                    echo "🛠 Tearing down previous Part II containers (if any)"
+                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans'
+                    
+                    echo "🚀 Starting Part II CI containers (frontend 8081, backend 7000)"
+                    sh 'docker-compose -f docker-compose.ci.yml up -d --build'
+                    
+                    sh 'docker system prune -f'
+                }
             }
         }
 
-        stage('Build & Deploy CI Containers') {
+        stage('Verify Deployment') {
             steps {
-                echo "🚀 Building and starting CI containers..."
-                sh """
-                docker-compose -f ${DOCKER_COMPOSE} -p ci up -d --build
-                """
-            }
-        }
-
-        stage('Verify CI Backend') {
-            steps {
-                echo "🔍 Checking CI backend health..."
-                sh """
-                for i in {1..20}; do
-                    if docker-compose -f ${DOCKER_COMPOSE} exec -T ${BACKEND_CONTAINER} curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
-                        echo "✅ CI Backend is up!"
-                        exit 0
-                    else
-                        echo "⏳ Waiting for CI backend..."
-                        sleep 5
-                    fi
-                done
-                echo "❌ CI Backend not reachable!"
-                exit 1
-                """
+                dir('repo') {
+                    echo "🔎 Listing running containers"
+                    sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
+                    
+                    echo "💻 Quick backend health check"
+                    sh '''
+                    sleep 5
+                    curl -s http://16.171.155.132:7000
+                    echo "✅ Backend reachable at http://16.171.155.132:7000"
+                    '''
+                }
             }
         }
     }
 
     post {
-        success {
-            echo "✅ CI Build & Deployment Successful!"
-            echo "Frontend (CI): http://16.171.155.132:8081"
-            echo "Backend (CI):  http://16.171.155.132:7000"
-        }
-        failure {
-            echo "⚠️ CI pipeline failed. Check logs."
-        }
         always {
-            script {
-                echo "🧹 Final workspace cleanup..."
-                cleanWs()
-            }
+            cleanWs()
+        }
+        success {
+            echo "🎉 CI pipeline succeeded!"
+            echo "Frontend: http://16.171.155.132:8081"
+            echo "Backend: http://16.171.155.132:7000"
         }
     }
 }
+
+
