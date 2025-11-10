@@ -11,35 +11,29 @@ services:
       - ci-network
 
   ci_backend:
-    image: node:18-bullseye
+    image: node:18-alpine
     container_name: ci_backend
     working_dir: /app
     volumes:
       - ./backend:/app:cached
     ports:
-      - "7000:5000"   # Host 7000 -> Container 5000
-    environment:
-      - NODE_ENV=production
-      - PORT=5000
-      - MONGO_URL=mongodb://ci_mongo:27017/ci_db
+      - "6000:5000"    # backend exposed on host port 6000
     command: sh -c "npm install --silent && npm start"
     depends_on:
       - ci_mongo
+    restart: always
     networks:
       - ci-network
-    restart: always
 
   ci_frontend:
-    image: node:18-bullseye
+    image: node:18-alpine
     container_name: ci_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app:cached
     ports:
-      - "8081:80"   # Host 8081 -> Container 80
-    environment:
-      - REACT_APP_BASE_URL=http://16.171.155.132:7000/api
-    command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80"
+      - "8081:80"      # frontend exposed on host port 8081
+    command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
     depends_on:
       - ci_backend
     restart: always

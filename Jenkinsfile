@@ -3,79 +3,52 @@ pipeline {
 
     environment {
         DOCKER_COMPOSE = 'docker-compose.ci.yml'
-        BACKEND_URL = 'http://localhost:6000/health'
+        BACKEND_URL = 'http://localhost:7000/health'
     }
 
     stages {
         stage('Clone Repository') {
             steps {
                 echo "📥 Cloning repository..."
-                git branch: 'main', url: 'https://github.com/Ayeshabbasi21/MERN-School-Management-System.git'
+                git branch: 'main', url: 'https://github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git'
             }
         }
 
-        stage('CI: Tear down previous Part II containers') {
+        stage('Clean Old CI Containers') {
             steps {
-                echo "🛠 Tearing down Part II containers (if any)..."
+                echo "🧹 Removing previous CI containers..."
                 sh """
-                # Remove previous containers if they exist
                 docker rm -f ci_mongo ci_backend ci_frontend || true
-                # Remove dangling networks to avoid conflicts
-                docker network prune -f || true
-                # Bring down any old containers from docker-compose
-                docker-compose -f ${DOCKER_COMPOSE} down --remove-orphans -v || true
+                docker network rm ci-network || true
+                docker volume rm ci_mongo_data || true
                 """
             }
         }
 
-        stage('CI: Build & Deploy Part II') {
+        stage('Build & Deploy CI (Part 2)') {
             steps {
-                echo "🚀 Starting Part II CI containers (frontend 8081, backend 6000)..."
+                echo "🚀 Building and starting CI containers..."
                 sh """
-                docker-compose -f ${DOCKER_COMPOSE} up -d --build
+                docker-compose -f ${DOCKER_COMPOSE} -p ci up -d --build
                 """
             }
         }
 
-        stage('Wait for Services') {
+        stage('Verify CI Backend') {
             steps {
-                echo "⏳ Waiting for MongoDB and Backend to be ready..."
+                echo "🔍 Checking CI backend health..."
                 sh """
-                # Wait for MongoDB
-                for i in {1..10}; do
-                    if docker exec ci_mongo mongo --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; then
-                        echo "✅ MongoDB ready"
-                        break
-                    else
-                        echo "⏳ Waiting for MongoDB..."
-                        sleep 5
-                    fi
-                done
-
-                # Wait for Backend
                 for i in {1..10}; do
                     if curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
-                        echo "✅ Backend healthy"
-                        break
+                        echo "✅ CI Backend is up!"
+                        exit 0
                     else
-                        echo "⏳ Waiting for Backend..."
+                        echo "⏳ Waiting for CI backend..."
                         sleep 5
                     fi
                 done
-                """
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                echo "🔍 Verifying Frontend and Backend reachability..."
-                sh """
-                if curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
-                    echo "✅ Backend reachable"
-                else
-                    echo "⚠ Backend not reachable"
-                    exit 1
-                fi
+                echo "❌ CI Backend not reachable!"
+                exit 1
                 """
             }
         }
@@ -83,15 +56,15 @@ pipeline {
 
     post {
         success {
-            echo "✅ CI Build and Deployment Successful!"
-            echo "Frontend: http://16.171.155.132:8081"
-            echo "Backend: http://16.171.155.132:6000"
+            echo "✅ CI Build & Deployment Successful!"
+            echo "Frontend (CI): http://16.171.155.132:8081"
+            echo "Backend (CI):  http://16.171.155.132:7000"
         }
         failure {
-            echo "❌ CI Build Failed! Check console logs."
+            echo "⚠️ CI pipeline failed. Check logs."
         }
         always {
-            echo "🧹 Cleaning up workspace..."
+            echo "🧹 Cleaning workspace..."
             cleanWs()
         }
     }

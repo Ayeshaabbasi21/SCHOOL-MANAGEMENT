@@ -1,29 +1,34 @@
-version: '3.8'
+version: "3.8"
 
 services:
   backend:
     build: ./backend
-    container_name: mern_backend
+    container_name: backend
     restart: always
     ports:
       - "5000:5000"
     environment:
-      - MONGODB_URI=mongodb+srv://ayesha13abbasi_db_user:<Aminadia_123>@cluster0.bgtmilp.mongodb.net/mern_school
+      - NODE_ENV=production
       - PORT=5000
-    networks:
-      - mern-network
+      - MONGO_URL=mongodb+srv://ayesha13abbasi_db_user:Aminadia_123@cluster0.bgtmilp.mongodb.net/schoolDB?retryWrites=true&w=majority
+      - JWT_SECRET=yourSecretKeyHere
+    depends_on: []
+    # no mongo dependency now, because we use Atlas
 
   frontend:
     build: ./frontend
-    container_name: mern_frontend
+    container_name: frontend
     restart: always
     ports:
-      - "80:80"
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://16.171.155.132:5000
     depends_on:
       - backend
-    networks:
-      - mern-network
 
-networks:
-  mern-network:
-    driver: bridge
+# Removed local mongo service since you use Atlas now
+# (no volume needed either)
+
+volumes:
+  # optional: keep placeholder in case needed later
+  mongo_data:
