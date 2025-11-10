@@ -4,6 +4,7 @@ pipeline {
     environment {
         DOCKER_COMPOSE = 'docker-compose.ci.yml'
         BACKEND_URL = 'http://localhost:7000/health'
+        MAX_RETRIES = 12       // Wait up to 60s (12 x 5s)
     }
 
     stages {
@@ -13,8 +14,8 @@ pipeline {
                 echo "🧹 Stopping old CI containers and cleaning workspace..."
                 sh """
                 docker-compose -f ${DOCKER_COMPOSE} -p ci down -v || true
-                sudo chown -R jenkins:jenkins $WORKSPACE || true
-                sudo chmod -R u+rwX $WORKSPACE || true
+                sudo chown -R jenkins:jenkins \$WORKSPACE || true
+                sudo chmod -R u+rwX \$WORKSPACE || true
                 """
             }
         }
@@ -38,19 +39,23 @@ pipeline {
         stage('Verify CI Backend') {
             steps {
                 echo "🔍 Checking CI backend health..."
-                sh """
-                for i in {1..10}; do
-                    if curl -sS --fail ${BACKEND_URL} >/dev/null 2>&1; then
-                        echo "✅ CI Backend is up!"
-                        exit 0
-                    else
-                        echo "⏳ Waiting for CI backend..."
-                        sleep 5
-                    fi
-                done
-                echo "❌ CI Backend not reachable!"
-                exit 1
-                """
+                script {
+                    def healthy = false
+                    for (int i = 1; i <= env.MAX_RETRIES.toInteger(); i++) {
+                        try {
+                            sh "curl -sS --fail ${BACKEND_URL}"
+                            echo "✅ CI Backend is up!"
+                            healthy = true
+                            break
+                        } catch (Exception e) {
+                            echo "⏳ Waiting for CI backend... (${i}/${env.MAX_RETRIES})"
+                            sleep 5
+                        }
+                    }
+                    if (!healthy) {
+                        error "❌ CI Backend not reachable after waiting!"
+                    }
+                }
             }
         }
     }
@@ -65,10 +70,8 @@ pipeline {
             echo "⚠️ CI pipeline failed. Check logs."
         }
         always {
-            node {
-                echo "🧹 Cleaning workspace..."
-                cleanWs()
-            }
+            echo "🧹 Cleaning workspace..."
+            cleanWs()
         }
     }
 }
