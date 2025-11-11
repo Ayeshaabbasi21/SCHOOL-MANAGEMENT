@@ -2,40 +2,39 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_PORT = "8081"
-        BACKEND_PORT = "7000"
+        GH_REPO = 'Ayeshaabbasi21/SCHOOL-MANAGEMENT'
+        GH_TOKEN_CRED = 'github-pat'
     }
 
     stages {
         stage('Checkout') {
             steps {
                 echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: "${GH_TOKEN_CRED}", variable: 'GH_TOKEN')]) {
                     sh '''
                         rm -rf repo
-                        git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
+                        git clone https://${GH_TOKEN}@github.com/${GH_REPO}.git repo
                     '''
                 }
             }
         }
 
-        stage('Cleanup') {
+        stage('Prepare Part-II Environment') {
             steps {
                 dir('repo') {
-                    echo "🧹 Pruning old Docker resources"
-                    sh 'docker system prune -af'
-                    echo "✅ Cleanup done"
+                    echo "🛑 Bringing down previous Part-II containers if any (won't affect Part-I)"
+                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
+
+                    echo "🔒 Setting permissions for workspace"
+                    sh 'sudo chown -R $USER:$USER ./backend ./frontend'
                 }
             }
         }
 
-        stage('CI: Build & Deploy Part II') {
+        stage('Build & Deploy Part-II') {
             steps {
                 dir('repo') {
-                    echo "🛠 Bringing down previous Part II containers if any"
-                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans'
-
-                    echo "🚀 Building and starting Part II containers"
+                    echo "🚀 Building and starting Part-II containers"
                     sh 'docker-compose -f docker-compose.ci.yml up -d --build'
                 }
             }
@@ -44,13 +43,13 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 dir('repo') {
-                    echo "🔎 Listing running containers"
+                    echo "🔎 Listing running Part-II containers"
                     sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
 
                     echo "💻 Quick backend health check"
                     sh '''
                         sleep 5
-                        curl -s http://ci_backend:5000 || echo "⚠️ Backend not reachable"
+                        curl -s http://localhost:7000 || echo "⚠️ Part-II backend not reachable"
                     '''
                 }
             }
@@ -59,13 +58,13 @@ pipeline {
 
     post {
         success {
+            echo "🎉 Part-II CI pipeline succeeded!"
+            echo "Frontend: http://<EC2_PUBLIC_IP>:8081"
+            echo "Backend: http://<EC2_PUBLIC_IP>:7000"
             cleanWs()
-            echo "🎉 CI pipeline succeeded!"
-            echo "Frontend: http://<YOUR-EC2-IP>:8081"
-            echo "Backend: http://<YOUR-EC2-IP>:7000"
         }
         failure {
-            echo "❌ CI pipeline failed!"
+            echo "❌ Part-II CI pipeline failed!"
         }
     }
 }

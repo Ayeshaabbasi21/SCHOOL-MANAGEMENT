@@ -4,7 +4,6 @@ services:
   ci_mongo:
     image: mongo:6.0
     container_name: ci_mongo
-    restart: always
     volumes:
       - ci_mongo_data:/data/db
     networks:
@@ -14,10 +13,11 @@ services:
     image: node:18-bullseye
     container_name: ci_backend
     working_dir: /app
+    user: "${UID}:${GID}"            # Run container as host user
     volumes:
-      - ./backend:/app:cached   # Jenkins volume mount
+      - ./backend:/app:cached
     ports:
-      - "7000:5000"
+      - "7000:5000"                 # Part-II backend port
     environment:
       - NODE_ENV=production
       - PORT=5000
@@ -27,22 +27,21 @@ services:
       - ci_mongo
     networks:
       - ci-network
-    restart: always
 
   ci_frontend:
     image: node:18-bullseye
     container_name: ci_frontend
     working_dir: /app
+    user: "${UID}:${GID}"            # Run container as host user
     volumes:
       - ./frontend:/app:cached
     ports:
-      - "8081:80"
+      - "8081:80"                   # Part-II frontend port
     environment:
       - REACT_APP_BASE_URL=http://ci_backend:5000/api
     command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
     depends_on:
       - ci_backend
-    restart: always
     networks:
       - ci-network
 
@@ -52,3 +51,4 @@ volumes:
 networks:
   ci-network:
     driver: bridge
+
