@@ -12,7 +12,10 @@ pipeline {
                 echo "🔄 Cloning latest code from GitHub"
                 withCredentials([string(credentialsId: "${GH_TOKEN_CRED}", variable: 'GH_TOKEN')]) {
                     sh '''
-                        rm -rf repo
+                        echo "🧹 Cleaning previous workspace"
+                        sudo rm -rf repo || true
+
+                        echo "📥 Cloning repository"
                         git clone https://${GH_TOKEN}@github.com/${GH_REPO}.git repo
                     '''
                 }
@@ -25,9 +28,16 @@ pipeline {
                     echo "🛑 Bringing down previous Part-II containers (won't affect Part-I)"
                     sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
 
-                    echo "🔒 Fixing permissions and removing old node_modules safely"
+                    echo "🔒 Fixing workspace permissions recursively"
                     sh '''
-                        sudo chown -R $USER:$USER ./backend ./frontend || true
+                        echo "📂 Adjusting ownership and permissions"
+                        sudo chown -R $USER:$USER . || true
+                        sudo chmod -R 777 backend frontend || true
+                    '''
+
+                    echo "🗑️ Removing old node_modules safely"
+                    sh '''
+                        sudo chmod -R 777 ./backend/node_modules ./frontend/node_modules || true
                         sudo rm -rf ./backend/node_modules ./frontend/node_modules || true
                     '''
                 }
@@ -36,13 +46,18 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                dir('repo/backend') {
+                dir('repo') {
                     echo "📦 Installing backend dependencies"
-                    sh 'npm install'
-                }
-                dir('repo/frontend') {
+                    sh '''
+                        cd backend
+                        npm install
+                    '''
+
                     echo "📦 Installing frontend dependencies"
-                    sh 'npm install'
+                    sh '''
+                        cd ../frontend
+                        npm install
+                    '''
                 }
             }
         }
@@ -63,12 +78,12 @@ pipeline {
                     sh '''
                         TIMEOUT=60
                         until curl -s http://localhost:7000; do
-                          sleep 5
-                          TIMEOUT=$((TIMEOUT-5))
-                          if [ $TIMEOUT -le 0 ]; then
-                            echo "⚠️ Part-II backend not reachable after 60s"
-                            exit 1
-                          fi
+                            sleep 5
+                            TIMEOUT=$((TIMEOUT-5))
+                            if [ $TIMEOUT -le 0 ]; then
+                                echo "⚠️ Backend not reachable after 60s"
+                                exit 1
+                            fi
                         done
                     '''
                 }
@@ -82,12 +97,12 @@ pipeline {
                     sh '''
                         TIMEOUT=120
                         until curl -s http://localhost:8081; do
-                          sleep 5
-                          TIMEOUT=$((TIMEOUT-5))
-                          if [ $TIMEOUT -le 0 ]; then
-                            echo "⚠️ Part-II frontend not reachable after 120s"
-                            exit 1
-                          fi
+                            sleep 5
+                            TIMEOUT=$((TIMEOUT-5))
+                            if [ $TIMEOUT -le 0 ]; then
+                                echo "⚠️ Frontend not reachable after 120s"
+                                exit 1
+                            fi
                         done
                     '''
                 }
@@ -101,12 +116,13 @@ pipeline {
             echo "Frontend: http://<EC2_PUBLIC_IP>:8081"
             echo "Backend: http://<EC2_PUBLIC_IP>:7000"
 
-            echo "🧹 Cleaning temporary log files only"
+            echo "🧹 Cleaning temporary files..."
             sh '''
                 find . -type f -name '*.log' -delete || true
                 find . -type f -name '*.tmp' -delete || true
             '''
         }
+
         failure {
             echo "❌ Part-II CI pipeline failed!"
         }
