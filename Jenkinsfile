@@ -1,39 +1,38 @@
 pipeline {
     agent any
 
-    environment {
-        // Make sure this matches your Jenkins credentials ID for GitHub PAT
-        GH_TOKEN = credentials('github-pat')
-    }
-
     stages {
         stage('Checkout') {
             steps {
                 echo "🔄 Cloning latest code from GitHub"
-                sh '''
-                    rm -rf repo
-                    git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
-                '''
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                    sh '''
+                        # Remove old repo folder
+                        rm -rf repo
+                        
+                        # Clone fresh copy
+                        git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
+                    '''
+                }
             }
         }
 
         stage('CI: Build & Deploy Part II') {
             steps {
                 dir('repo') {
-                    echo "🛠 Tearing down previous Part II containers (if any)"
+                    echo "🛠 Bringing down previous Part II containers if any"
                     sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans'
 
-                    echo "🚀 Starting Part II CI containers (frontend 8081, backend 7000)"
-                    // Use absolute paths to avoid Jenkins workspace issues
+                    echo "🚀 Building and starting Part II containers"
                     sh 'docker-compose -f docker-compose.ci.yml up -d --build'
 
-                    // Optional cleanup
+                    echo "🧹 Cleaning unused Docker resources"
                     sh 'docker system prune -f'
                 }
             }
             post {
                 always {
-                    echo "✅ Part II CI containers should now be running"
+                    echo "✅ Part II containers should now be running"
                 }
             }
         }
