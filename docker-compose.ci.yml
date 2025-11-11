@@ -39,7 +39,7 @@ services:
       - "8081:80"   # Host 8081 -> Container 80
     environment:
       - REACT_APP_BASE_URL=http://16.171.155.132:7000/api
-    command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80"
+    command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80 -b 0.0.0.0"
     depends_on:
       - ci_backend
     restart: always
