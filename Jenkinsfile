@@ -5,26 +5,30 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: 'GH_TOKEN', variable: 'GH_TOKEN')]) {
                     sh '''
-                    rm -rf repo
-                    git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
+                        rm -rf repo
+                        git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
                     '''
                 }
             }
         }
 
-        stage('CI: Build & Deploy') {
+        stage('CI: Build & Deploy Part II') {
             steps {
                 dir('repo') {
-                    echo "🛠 Tearing down previous containers"
-                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
-                    
-                    echo "🚀 Starting CI containers"
+                    echo "🛠 Tearing down previous Part II containers (if any)"
+                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans'
+
+                    echo "🚀 Starting Part II CI containers (frontend 8081, backend 7000)"
                     sh 'docker-compose -f docker-compose.ci.yml up -d --build'
-                    
-                    echo "⏳ Waiting for backend to start..."
-                    sh 'sleep 60'  // Wait 1 minute for npm install + app start
+
+                    sh 'docker system prune -f'
+                }
+            }
+            post {
+                always {
+                    echo "✅ Part II CI containers should now be running"
                 }
             }
         }
@@ -33,21 +37,12 @@ pipeline {
             steps {
                 dir('repo') {
                     echo "🔎 Listing running containers"
-                    sh 'docker ps --format "table {{.Names}}\t{{.Ports}}"'
-                    
-                    echo "💻 Backend health check"
+                    sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
+
+                    echo "💻 Quick backend health check"
                     sh '''
-                    # Try multiple times with increasing delays
-                    for i in 1 2 3 4 5; do
-                        if curl -f http://16.171.155.132:7000/health || curl -f http://16.171.155.132:7000; then
-                            echo "✅ Backend is healthy!"
-                            break
-                        else
-                            echo "⏳ Backend not ready yet, waiting... (attempt $i)"
-                            sleep 30
-                        fi
-                    done
-                    echo "✅ Backend reachable at http://16.171.155.132:7000"
+                        sleep 5
+                        curl -s http://16.171.155.132:7000 || echo "⚠️ Backend not reachable"
                     '''
                 }
             }
@@ -55,17 +50,14 @@ pipeline {
     }
 
     post {
-        always {
-            cleanWs()
-        }
         success {
+            cleanWs()
             echo "🎉 CI pipeline succeeded!"
             echo "Frontend: http://16.171.155.132:8081"
             echo "Backend: http://16.171.155.132:7000"
         }
         failure {
-            echo "⚠️ CI pipeline failed. Check logs."
-            sh 'docker-compose -f docker-compose.ci.yml logs || true'
+            echo "❌ CI pipeline failed!"
         }
     }
 }
