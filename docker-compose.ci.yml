@@ -38,7 +38,7 @@ services:
     ports:
       - "8081:80"                   # Part-II frontend port
     environment:
-      - REACT_APP_BASE_URL=http://ci_backend:5000/api
+      - REACT_APP_BASE_URL=http://16.171.155.132:7000/api
     command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
     depends_on:
       - ci_backend
