@@ -15,9 +15,9 @@ services:
     container_name: ci_backend
     working_dir: /app
     volumes:
-      - ./backend:/app:cached
+      - ./backend:/app:cached   # Jenkins volume mount
     ports:
-      - "7000:5000"   # Host 7000 -> Container 5000
+      - "7000:5000"
     environment:
       - NODE_ENV=production
       - PORT=5000
@@ -36,10 +36,10 @@ services:
     volumes:
       - ./frontend:/app:cached
     ports:
-      - "8081:80"   # Host 8081 -> Container 80
+      - "8081:80"
     environment:
-      - REACT_APP_BASE_URL=http://16.171.155.132:7000/api
-    command: sh -c "npm install --silent && npm run build && npm install -g serve && serve -s build -l 80 -b 0.0.0.0"
+      - REACT_APP_BASE_URL=http://ci_backend:5000/api
+    command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
     depends_on:
       - ci_backend
     restart: always
