@@ -40,16 +40,25 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify Backend') {
             steps {
                 dir('repo') {
-                    echo "🔎 Listing running Part-II containers"
-                    sh 'docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"'
-
                     echo "💻 Quick backend health check"
                     sh '''
                         sleep 5
                         curl -s http://localhost:7000 || echo "⚠️ Part-II backend not reachable"
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Frontend') {
+            steps {
+                dir('repo') {
+                    echo "💻 Quick frontend health check"
+                    sh '''
+                        sleep 5
+                        curl -s http://localhost:8081 || echo "⚠️ Part-II frontend not reachable"
                     '''
                 }
             }
@@ -61,7 +70,13 @@ pipeline {
             echo "🎉 Part-II CI pipeline succeeded!"
             echo "Frontend: http://<EC2_PUBLIC_IP>:8081"
             echo "Backend: http://<EC2_PUBLIC_IP>:7000"
-            cleanWs()
+
+            // Only clean temp/log files, NOT workspace folders
+            echo "🧹 Cleaning temporary files..."
+            sh '''
+                find . -type f -name '*.log' -delete
+                find . -type f -name '*.tmp' -delete
+            '''
         }
         failure {
             echo "❌ Part-II CI pipeline failed!"

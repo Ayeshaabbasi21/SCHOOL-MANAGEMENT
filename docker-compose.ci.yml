@@ -8,7 +8,7 @@ services:
       - ci_mongo_data:/data/db
     networks:
       - ci-network
-
+    restart: unless-stopped
   ci_backend:
     image: node:18-bullseye
     container_name: ci_backend
@@ -27,7 +27,7 @@ services:
       - ci_mongo
     networks:
       - ci-network
-
+    restart: unless-stopped
   ci_frontend:
     image: node:18-bullseye
     container_name: ci_frontend
@@ -44,7 +44,7 @@ services:
       - ci_backend
     networks:
       - ci-network
-
+    restart: unless-stopped
 volumes:
   ci_mongo_data:
 
