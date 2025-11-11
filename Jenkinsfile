@@ -1,16 +1,19 @@
 pipeline {
     agent any
 
+    environment {
+        // Make sure this matches your Jenkins credentials ID for GitHub PAT
+        GH_TOKEN = credentials('github-pat')
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: 'github-pat', variable: 'github-pat')]) {
-                    sh '''
-                        rm -rf repo
-                        git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
-                    '''
-                }
+                sh '''
+                    rm -rf repo
+                    git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
+                '''
             }
         }
 
@@ -21,8 +24,10 @@ pipeline {
                     sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans'
 
                     echo "🚀 Starting Part II CI containers (frontend 8081, backend 7000)"
+                    // Use absolute paths to avoid Jenkins workspace issues
                     sh 'docker-compose -f docker-compose.ci.yml up -d --build'
 
+                    // Optional cleanup
                     sh 'docker system prune -f'
                 }
             }
