@@ -5,7 +5,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: 'GH_TOKEN', variable: 'GH_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github-pat', variable: 'github-pat')]) {
                     sh '''
                         rm -rf repo
                         git clone https://${GH_TOKEN}@github.com/Ayeshaabbasi21/SCHOOL-MANAGEMENT.git repo
