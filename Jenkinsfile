@@ -1,130 +1,121 @@
 pipeline {
     agent any
-
+    
+    // REMOVE the parameters section - no manual trigger needed!
+    
     environment {
         GH_REPO = 'Ayeshaabbasi21/SCHOOL-MANAGEMENT'
         GH_TOKEN_CRED = 'github-pat'
+        COMPOSE_FILE = 'docker-compose.ci.yml'
+        PROJECT_NAME = 'part2'
     }
-
+    
     stages {
-        stage('Checkout') {
+        stage('Clean Workspace') {
             steps {
-                echo "🔄 Cloning latest code from GitHub"
-                withCredentials([string(credentialsId: "${GH_TOKEN_CRED}", variable: 'GH_TOKEN')]) {
-                    sh '''
-                        echo "🧹 Cleaning previous workspace"
-                        sudo rm -rf repo || true
-
-                        echo "📥 Cloning repository"
-                        git clone https://${GH_TOKEN}@github.com/${GH_REPO}.git repo
-                    '''
+                echo "🧹 Cleaning workspace from previous build..."
+                cleanWs()
+            }
+        }
+        
+        stage('Checkout Latest Code') {
+            steps {
+                echo "🔄 Pulling latest code changes from GitHub"
+                withCredentials([string(credentialsId: "${env.GH_TOKEN_CRED}", variable: 'GH_TOKEN')]) {
+                    sh """
+                        git clone https://${GH_TOKEN}@github.com/${env.GH_REPO}.git .
+                    """
                 }
             }
         }
-
-        stage('Prepare Part-II Environment') {
+        
+        stage('Stop Previous Containers') {
             steps {
-                dir('repo') {
-                    echo "🛑 Bringing down previous Part-II containers (won't affect Part-I)"
-                    sh 'docker-compose -f docker-compose.ci.yml down --remove-orphans || true'
-
-                    echo "🔒 Fixing workspace permissions recursively"
-                    sh '''
-                        echo "📂 Adjusting ownership and permissions"
-                        sudo chown -R $USER:$USER . || true
-                        sudo chmod -R 777 backend frontend || true
-                    '''
-
-                    echo "🗑️ Removing old node_modules safely"
-                    sh '''
-                        sudo chmod -R 777 ./backend/node_modules ./frontend/node_modules || true
-                        sudo rm -rf ./backend/node_modules ./frontend/node_modules || true
-                    '''
+                echo "🛑 Stopping any running Part-II containers..."
+                script {
+                    sh """
+                        docker-compose -f ${env.COMPOSE_FILE} -p ${env.PROJECT_NAME} down --remove-orphans || true
+                    """
                 }
             }
         }
-
-        stage('Install Dependencies') {
+        
+        stage('Initialize Volumes') {
             steps {
-                dir('repo') {
-                    echo "📦 Installing backend dependencies"
-                    sh '''
-                        cd backend
-                        npm install
-                    '''
-
-                    echo "📦 Installing frontend dependencies"
-                    sh '''
-                        cd ../frontend
-                        npm install
-                    '''
+                echo "📦 Copying latest code to volumes..."
+                script {
+                    sh """
+                        chmod +x init-volumes.sh
+                        ./init-volumes.sh
+                    """
                 }
             }
         }
-
-        stage('Build & Deploy Part-II') {
+        
+        stage('Deploy Latest Version') {
             steps {
-                dir('repo') {
-                    echo "🚀 Building and starting Part-II containers"
-                    sh 'docker-compose -f docker-compose.ci.yml up -d --build'
+                echo "🚀 Deploying updated containers..."
+                script {
+                    sh """
+                        docker-compose -f ${env.COMPOSE_FILE} -p ${env.PROJECT_NAME} up -d --build
+                    """
                 }
             }
         }
-
-        stage('Verify Backend') {
+        
+        stage('Health Check') {
             steps {
-                dir('repo') {
-                    echo "💻 Quick backend health check"
-                    sh '''
-                        TIMEOUT=60
-                        until curl -s http://localhost:7000; do
-                            sleep 5
-                            TIMEOUT=$((TIMEOUT-5))
-                            if [ $TIMEOUT -le 0 ]; then
-                                echo "⚠️ Backend not reachable after 60s"
-                                exit 1
-                            fi
-                        done
-                    '''
-                }
-            }
-        }
-
-        stage('Verify Frontend') {
-            steps {
-                dir('repo') {
-                    echo "💻 Quick frontend health check"
-                    sh '''
-                        TIMEOUT=120
-                        until curl -s http://localhost:8081; do
-                            sleep 5
-                            TIMEOUT=$((TIMEOUT-5))
-                            if [ $TIMEOUT -le 0 ]; then
-                                echo "⚠️ Frontend not reachable after 120s"
-                                exit 1
-                            fi
-                        done
-                    '''
+                echo "🏥 Verifying deployment..."
+                script {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        waitUntil {
+                            try {
+                                sh "curl -s -f http://localhost:7000 > /dev/null"
+                                echo "✅ Backend deployment successful"
+                                return true
+                            } catch (Exception e) {
+                                sleep 10
+                                return false
+                            }
+                        }
+                    }
+                    
+                    timeout(time: 3, unit: 'MINUTES') {
+                        waitUntil {
+                            try {
+                                sh "curl -s -f http://localhost:8081 > /dev/null"
+                                echo "✅ Frontend deployment successful"
+                                return true
+                            } catch (Exception e) {
+                                sleep 10
+                                return false
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-
+    
     post {
-        success {
-            echo "🎉 Part-II CI pipeline succeeded!"
-            echo "Frontend: http://<EC2_PUBLIC_IP>:8081"
-            echo "Backend: http://<EC2_PUBLIC_IP>:7000"
-
-            echo "🧹 Cleaning temporary files..."
-            sh '''
-                find . -type f -name '*.log' -delete || true
-                find . -type f -name '*.tmp' -delete || true
-            '''
+        always {
+            echo "📊 Build completed"
+            sh "docker-compose -f ${env.COMPOSE_FILE} -p ${env.PROJECT_NAME} ps || true"
         }
-
+        success {
+            echo """
+            🎉 Automated Deployment Successful!
+            
+            📍 Your application is now live:
+            Frontend: http://16.171.155.132:8081
+            Backend: http://16.171.155.132:7000
+            
+            🔄 Triggered by: GitHub commit
+            """
+        }
         failure {
-            echo "❌ Part-II CI pipeline failed!"
+            echo "❌ Automated deployment failed!"
+            sh "docker-compose -f ${env.COMPOSE_FILE} -p ${env.PROJECT_NAME} logs || true"
         }
     }
 }
