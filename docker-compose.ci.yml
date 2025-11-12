@@ -9,15 +9,16 @@ services:
     networks:
       - ci-network
     restart: unless-stopped
+
   ci_backend:
     image: node:18-bullseye
     container_name: ci_backend
     working_dir: /app
-    user: "${UID}:${GID}"            # Run container as host user
     volumes:
-      - ./backend:/app:cached
+      - backend_code:/app
+      - /app/node_modules
     ports:
-      - "7000:5000"                 # Part-II backend port
+      - "7000:5000"
     environment:
       - NODE_ENV=production
       - PORT=5000
@@ -28,15 +29,16 @@ services:
     networks:
       - ci-network
     restart: unless-stopped
+
   ci_frontend:
     image: node:18-bullseye
     container_name: ci_frontend
     working_dir: /app
-    user: "${UID}:${GID}"            # Run container as host user
     volumes:
-      - ./frontend:/app:cached
+      - frontend_code:/app
+      - /app/node_modules
     ports:
-      - "8081:80"                   # Part-II frontend port
+      - "8081:80"
     environment:
       - REACT_APP_BASE_URL=http://16.171.155.132:7000/api
     command: sh -c "npm install --silent && npm run build && npx serve -s build -l 80"
@@ -45,10 +47,15 @@ services:
     networks:
       - ci-network
     restart: unless-stopped
+
 volumes:
   ci_mongo_data:
+    driver: local
+  backend_code:
+    driver: local
+  frontend_code:
+    driver: local
 
 networks:
   ci-network:
     driver: bridge
-
