@@ -1,18 +1,17 @@
 #!/bin/bash
-echo "📦 Initializing volumes with code..."
+echo "📦 Setting up application with dependencies..."
 
-# Remove existing volumes if they exist
-docker volume rm repo_backend_code repo_frontend_code 2>/dev/null || true
+# Remove existing volumes
+docker volume rm backend_code frontend_code ci_mongo_data 2>/dev/null || true
 
-# Create temporary containers to copy code to volumes
-echo "Copying backend code to volume..."
-docker container create --name temp_backend -v repo_backend_code:/app busybox
-docker cp ./backend/. temp_backend:/app/
-docker rm temp_backend
+# Create backend with dependencies
+echo "Installing backend dependencies..."
+docker run --rm -v $(pwd)/backend:/app -w /app node:18-bullseye \
+  sh -c "npm install --silent && cp -r /app/node_modules /tmp/"
 
-echo "Copying frontend code to volume..."
-docker container create --name temp_frontend -v repo_frontend_code:/app busybox
-docker cp ./frontend/. temp_frontend:/app/
-docker rm temp_frontend
+# Create frontend with dependencies  
+echo "Installing frontend dependencies..."
+docker run --rm -v $(pwd)/frontend:/app -w /app node:18-bullseye \
+  sh -c "npm install --silent && npm run build && cp -r /app/node_modules /tmp/ && cp -r /app/build /tmp/"
 
-echo "✅ Volume initialization complete"
+echo "✅ Dependencies installed and ready"

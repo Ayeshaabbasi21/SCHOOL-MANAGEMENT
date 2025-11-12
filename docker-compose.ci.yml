@@ -15,8 +15,7 @@ services:
     container_name: ci_backend
     working_dir: /app
     volumes:
-      - backend_code:/app
-      - /app/node_modules
+      - ./backend:/app  # Use bind mount instead of volume
     ports:
       - "7000:5000"
     environment:
@@ -35,8 +34,7 @@ services:
     container_name: ci_frontend
     working_dir: /app
     volumes:
-      - frontend_code:/app
-      - /app/node_modules
+      - ./frontend:/app  # Use bind mount instead of volume
     ports:
       - "8081:80"
     environment:
@@ -50,11 +48,6 @@ services:
 
 volumes:
   ci_mongo_data:
-    driver: local
-  backend_code:
-    driver: local
-  frontend_code:
-    driver: local
 
 networks:
   ci-network:
